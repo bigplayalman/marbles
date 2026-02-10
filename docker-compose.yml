@@ -3,8 +3,8 @@ services:
     build:
       context: .
       dockerfile: client/Dockerfile
-    ports:
-      - "80:80"
+    expose:
+      - "80"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:80/"]
