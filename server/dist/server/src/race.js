@@ -29,7 +29,7 @@ const MIN_PASSAGE_WIDTH = MARBLE_RADIUS * 2 * 3 + 20;
 const SEGMENT_TYPES = [
     'slope', 'steep_slope', 'flat', 'funnel',
     'wide_curve', 'zigzag', 'drop', 'narrow', 'gentle_bend', 'split',
-    'quarter_pipe', 'mini_ramp', 'half_pipe',
+    'quarter_pipe', 'mini_ramp', 'half_pipe', 'lattice', 'lattice',
 ];
 function getSegmentEnd(segment) {
     const leftEnd = segment.points[segment.points.length - 1];
@@ -189,6 +189,7 @@ function createMazeSegmentServer(prev, width, rng) {
     const mazeWidth = width * 1.4;
     const corridorWidth = width * 0.6;
     const mazeHW = mazeWidth / 2;
+    const tiltAngle = 21 * Math.PI / 180;
     const x = prev.x;
     const y = prev.y;
     const leftPts = [{ x: prev.leftX, y: prev.leftY }];
@@ -211,16 +212,27 @@ function createMazeSegmentServer(prev, width, rng) {
             const shelfLeft = x - mazeHW + 10;
             const shelfRight = x + mazeHW - 10;
             const gapSize = corridorWidth;
+            let shelfStartX, shelfEndX;
+            if (gapOnRight) {
+                shelfStartX = shelfLeft;
+                shelfEndX = shelfRight - gapSize;
+            }
+            else {
+                shelfStartX = shelfLeft + gapSize;
+                shelfEndX = shelfRight;
+            }
+            const shelfLen = Math.abs(shelfEndX - shelfStartX);
+            const yDrop = Math.tan(tiltAngle) * shelfLen;
             if (gapOnRight) {
                 dividers.push([
-                    { x: shelfLeft, y: shelfY },
-                    { x: shelfRight - gapSize, y: shelfY },
+                    { x: shelfStartX, y: shelfY },
+                    { x: shelfEndX, y: shelfY + yDrop },
                 ]);
             }
             else {
                 dividers.push([
-                    { x: shelfLeft + gapSize, y: shelfY },
-                    { x: shelfRight, y: shelfY },
+                    { x: shelfStartX, y: shelfY + yDrop },
+                    { x: shelfEndX, y: shelfY },
                 ]);
             }
             shelfY += turnH;
@@ -489,6 +501,70 @@ function createServerSegment(type, prev, width, rng) {
                 ]),
             };
         }
+        case 'lattice': {
+            // Diamond lattice: staggered rows of short angled divider walls — wide gaps
+            const numRows = rngInt(rng, 3, 5);
+            const sh = rngRange(rng, 1000, 1500);
+            const drift = rngRange(rng, -20, 20);
+            const latticeWidth = width * rngRange(rng, 1.6, 2.0);
+            const latticeHW = latticeWidth / 2;
+            const centerX = x + drift;
+            const entryZone = sh * 0.10;
+            const exitZone = sh * 0.10;
+            const latticeH = sh - entryZone - exitZone;
+            const rowSpacing = latticeH / (numRows + 1);
+            const wallsPerRow = rngInt(rng, 2, 4);
+            const wallLen = rngRange(rng, 40, 65);
+            const wallAngle = rngRange(rng, 30, 45) * Math.PI / 180;
+            const wallDx = Math.cos(wallAngle) * wallLen / 2;
+            const wallDy = Math.sin(wallAngle) * wallLen / 2;
+            const leftPts = [
+                { x: lx, y: ly },
+                { x: centerX - latticeHW, y: y + entryZone * 0.5 },
+                { x: centerX - latticeHW, y: y + sh - exitZone * 0.5 },
+                { x: x - hw + drift, y: y + sh },
+            ];
+            const rightPts = [
+                { x: rx, y: ry },
+                { x: centerX + latticeHW, y: y + entryZone * 0.5 },
+                { x: centerX + latticeHW, y: y + sh - exitZone * 0.5 },
+                { x: x + hw + drift, y: y + sh },
+            ];
+            const dividers = [];
+            const inset = MARBLE_RADIUS * 4;
+            const usableWidth = latticeWidth - inset * 2;
+            for (let row = 0; row < numRows; row++) {
+                const rowY = y + entryZone + rowSpacing * (row + 1);
+                const isOffset = row % 2 === 1;
+                const nWalls = isOffset ? wallsPerRow - 1 : wallsPerRow;
+                if (nWalls <= 0)
+                    continue;
+                const spacing = usableWidth / (isOffset ? wallsPerRow : wallsPerRow + 1);
+                const rowStartX = centerX - latticeHW + inset;
+                for (let w = 0; w < nWalls; w++) {
+                    let wx;
+                    if (isOffset) {
+                        wx = rowStartX + spacing * (w + 1);
+                    }
+                    else {
+                        wx = rowStartX + spacing * (w + 0.5);
+                    }
+                    wx += rngRange(rng, -12, 12);
+                    const wy = rowY + rngRange(rng, -8, 8);
+                    const angleDir = (row + w) % 2 === 0 ? 1 : -1;
+                    dividers.push([
+                        { x: wx - wallDx, y: wy - wallDy * angleDir },
+                        { x: wx + wallDx, y: wy + wallDy * angleDir },
+                    ]);
+                }
+            }
+            return {
+                type,
+                points: smoothPoints(leftPts),
+                rightPoints: smoothPoints(rightPts),
+                dividers,
+            };
+        }
         case 'half_pipe': {
             const sh = rngRange(rng, 600, 900);
             const swingAmount = rngRange(rng, 80, 130);
@@ -591,8 +667,8 @@ export function createServerRace(lobby, track, gravityScale = 0.0004) {
     const tickMs = 1000 / TICK_RATE;
     const OOB_MARGIN = 500;
     const stuckTracking = new Map();
-    const STUCK_CHECK_INTERVAL = 1200;
-    const STUCK_THRESHOLD = 8;
+    const STUCK_CHECK_INTERVAL = 800;
+    const STUCK_THRESHOLD = 6;
     function isOutOfBounds(body) {
         const { x, y } = body.position;
         return (x < track.boundsMinX - OOB_MARGIN ||
@@ -636,15 +712,19 @@ export function createServerRace(lobby, track, gravityScale = 0.0004) {
                         const speed = Math.sqrt(body.velocity.x ** 2 + body.velocity.y ** 2);
                         if (dy < STUCK_THRESHOLD && speed < 2) {
                             const stuckCount = tracking.stuckCount + 1;
-                            const force = Math.min(stuckCount, 5);
-                            if (stuckCount >= 4) {
-                                Body.setPosition(body, { x: body.position.x + (Math.random() - 0.5) * 20, y: body.position.y + 15 });
-                                Body.setVelocity(body, { x: (Math.random() - 0.5) * 6, y: 5 + Math.random() * 3 });
+                            const force = Math.min(stuckCount, 8);
+                            if (stuckCount >= 5) {
+                                Body.setPosition(body, { x: body.position.x + (Math.random() - 0.5) * 40, y: body.position.y + 25 + stuckCount * 5 });
+                                Body.setVelocity(body, { x: (Math.random() - 0.5) * 12, y: 8 + Math.random() * 6 + stuckCount * 2 });
+                            }
+                            else if (stuckCount >= 3) {
+                                Body.setPosition(body, { x: body.position.x + (Math.random() - 0.5) * 25, y: body.position.y + 15 });
+                                Body.setVelocity(body, { x: (Math.random() - 0.5) * 8, y: 6 + Math.random() * 4 });
                             }
                             else {
                                 Body.setVelocity(body, {
-                                    x: body.velocity.x + (Math.random() - 0.5) * 4 * force,
-                                    y: body.velocity.y + (2 + Math.random() * 2) * force,
+                                    x: body.velocity.x + (Math.random() - 0.5) * 6 * force,
+                                    y: body.velocity.y + (3 + Math.random() * 3) * force,
                                 });
                             }
                             stuckTracking.set(id, { x: body.position.x, y: body.position.y, time: elapsedTime, stuckCount });

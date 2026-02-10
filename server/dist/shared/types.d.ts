@@ -17,7 +17,7 @@ export interface MarbleState {
     position?: number;
     disqualified: boolean;
 }
-export type SegmentType = 'slope' | 'steep_slope' | 'flat' | 'funnel' | 'wide_curve' | 'zigzag' | 'drop' | 'narrow' | 'gentle_bend' | 'split' | 'quarter_pipe' | 'mini_ramp' | 'half_pipe' | 'maze' | 'finish';
+export type SegmentType = 'slope' | 'steep_slope' | 'flat' | 'funnel' | 'wide_curve' | 'zigzag' | 'drop' | 'narrow' | 'gentle_bend' | 'split' | 'quarter_pipe' | 'mini_ramp' | 'half_pipe' | 'maze' | 'lattice' | 'finish';
 export interface TrackPoint {
     x: number;
     y: number;
@@ -115,7 +115,6 @@ export type ServerMessage = {
 } | {
     type: 'race_start';
     trackSeed: number;
-    track: Track;
     marbles: MarbleConfig[];
     gravityScale: number;
 } | {
@@ -139,6 +138,6 @@ export declare const MAX_MARBLES = 20;
 export declare const LOBBY_CODE_LENGTH = 6;
 export declare const COUNTDOWN_SECONDS = 3;
 export declare const TICK_RATE = 60;
-export declare const SYNC_RATE = 60;
+export declare const SYNC_RATE = 30;
 export declare const PLAYER_NAMES: string[];
 export declare const MARBLE_COLORS: string[];

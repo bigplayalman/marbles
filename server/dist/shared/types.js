@@ -9,7 +9,7 @@ export const MAX_MARBLES = 20;
 export const LOBBY_CODE_LENGTH = 6;
 export const COUNTDOWN_SECONDS = 3;
 export const TICK_RATE = 60; // physics ticks per second
-export const SYNC_RATE = 60; // network sync rate (match tick rate for smooth 60fps)
+export const SYNC_RATE = 30; // network sync rate
 export const PLAYER_NAMES = [
     'Thunderball', 'Big Red', 'Slick', 'Pebble', 'Cannonball',
     'Dizzy', 'Rocket', 'Bouncer', 'Shadow', 'Blaze',

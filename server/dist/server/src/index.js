@@ -139,11 +139,10 @@ function handleMessage(playerId, socket, msg) {
                 isBot: p.isBot,
                 ownerId: p.isBot ? undefined : p.id,
             }));
-            // Broadcast race start with full track data to all players
+            // Broadcast race start to all players
             const raceStartMsg = {
                 type: 'race_start',
                 trackSeed: seed,
-                track,
                 marbles: marbleConfigs,
                 gravityScale,
             };
